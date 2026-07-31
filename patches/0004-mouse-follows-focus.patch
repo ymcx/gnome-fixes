@@ -1,0 +1,448 @@
+diff --git a/src/compositor/meta-window-drag.c b/src/compositor/meta-window-drag.c
+index 00b0ce2797..e4c633b726 100644
+--- a/src/compositor/meta-window-drag.c
++++ b/src/compositor/meta-window-drag.c
+@@ -2027,7 +2027,7 @@ meta_window_drag_begin (MetaWindowDrag      *window_drag,
+   meta_topic (META_DEBUG_FOCUS,
+               "Focusing %s because we're grabbing all its keys",
+               window->desc);
+-  meta_window_focus (window, timestamp);
++  meta_window_focus (window, timestamp, TRUE);
+ 
+   stage = CLUTTER_STAGE (meta_backend_get_stage (backend));
+ 
+diff --git a/src/core/display-private.h b/src/core/display-private.h
+index af80a2942e..ed9383d262 100644
+--- a/src/core/display-private.h
++++ b/src/core/display-private.h
+@@ -248,7 +248,8 @@ void meta_display_accelerator_deactivate (MetaDisplay           *display,
+ void meta_display_modifiers_accelerator_activate (MetaDisplay *display);
+ 
+ void meta_display_update_focus_window (MetaDisplay *display,
+-                                       MetaWindow  *window);
++                                       MetaWindow  *window,
++                                       gboolean     warp_pointer);
+ 
+ void meta_display_sanity_check_timestamps (MetaDisplay *display,
+                                            guint32      timestamp);
+diff --git a/src/core/display.c b/src/core/display.c
+index 45f8080bd3..3485c6cb0e 100644
+--- a/src/core/display.c
++++ b/src/core/display.c
+@@ -1150,7 +1150,7 @@ on_is_grabbed_changed (ClutterStage *stage,
+   if (!priv->focus_on_grab_dismissed.window)
+     return;
+ 
+-  meta_window_focus (priv->focus_on_grab_dismissed.window, META_CURRENT_TIME);
++  meta_window_focus (priv->focus_on_grab_dismissed.window, META_CURRENT_TIME, TRUE);
+ 
+   g_clear_signal_handler (&priv->focus_on_grab_dismissed.unmanaging_handler_id,
+                           priv->focus_on_grab_dismissed.window);
+@@ -1314,7 +1314,8 @@ meta_window_set_inactive_since (MetaWindow  *window,
+ 
+ void
+ meta_display_update_focus_window (MetaDisplay *display,
+-                                  MetaWindow  *window)
++                                  MetaWindow  *window,
++                                  gboolean     warp_pointer)
+ {
+   MetaWindow *previous = NULL;
+ 
+@@ -1334,7 +1335,7 @@ meta_display_update_focus_window (MetaDisplay *display,
+       previous = display->focus_window;
+       display->focus_window = NULL;
+ 
+-      meta_window_set_focused_internal (previous, FALSE);
++      meta_window_set_focused_internal (previous, FALSE, TRUE);
+     }
+ 
+   display->focus_window = window;
+@@ -1343,7 +1344,7 @@ meta_display_update_focus_window (MetaDisplay *display,
+     {
+       meta_topic (META_DEBUG_FOCUS, "* Focus --> %s",
+                   display->focus_window->desc);
+-      meta_window_set_focused_internal (display->focus_window, TRUE);
++      meta_window_set_focused_internal (display->focus_window, TRUE, warp_pointer);
+     }
+   else
+     meta_topic (META_DEBUG_FOCUS, "* Focus --> NULL");
+@@ -1392,7 +1393,8 @@ meta_display_timestamp_too_old (MetaDisplay *display,
+ void
+ meta_display_set_input_focus (MetaDisplay *display,
+                               MetaWindow  *window,
+-                              guint32      timestamp)
++                              guint32      timestamp,
++                              gboolean     warp_pointer)
+ {
+   MetaDisplayPrivate *priv = meta_display_get_instance_private (display);
+ 
+@@ -1403,7 +1405,7 @@ meta_display_set_input_focus (MetaDisplay *display,
+ 
+   g_signal_emit (display, display_signals[FOCUS_WINDOW], 0, window, ms2us (timestamp));
+ 
+-  meta_display_update_focus_window (display, window);
++  meta_display_update_focus_window (display, window, warp_pointer);
+ 
+   display->last_focus_time = timestamp;
+ 
+@@ -1415,7 +1417,7 @@ void
+ meta_display_unset_input_focus (MetaDisplay *display,
+                                 guint32      timestamp)
+ {
+-  meta_display_set_input_focus (display, NULL, timestamp);
++  meta_display_set_input_focus (display, NULL, timestamp, TRUE);
+ }
+ 
+ void
+@@ -3484,7 +3486,7 @@ focus_mouse_mode (MetaDisplay *display,
+       meta_topic (META_DEBUG_FOCUS,
+                   "Focusing %s at time %u.", window->desc, timestamp_ms);
+ 
+-      meta_window_focus (window, timestamp_ms);
++      meta_window_focus (window, timestamp_ms, FALSE);
+ 
+       if (meta_prefs_get_auto_raise ())
+         meta_display_queue_autoraise_callback (display, window);
+diff --git a/src/core/meta-workspace-manager.c b/src/core/meta-workspace-manager.c
+index c314bd8119..c7bc4ed737 100644
+--- a/src/core/meta-workspace-manager.c
++++ b/src/core/meta-workspace-manager.c
+@@ -963,7 +963,7 @@ meta_workspace_manager_show_desktop (MetaWorkspaceManager *workspace_manager,
+ 
+       if (w->type == META_WINDOW_DESKTOP)
+         {
+-          meta_window_focus (w, timestamp);
++          meta_window_focus (w, timestamp, TRUE);
+           break;
+         }
+     }
+diff --git a/src/core/window-private.h b/src/core/window-private.h
+index 2441d4d736..037a400771 100644
+--- a/src/core/window-private.h
++++ b/src/core/window-private.h
+@@ -571,7 +571,8 @@ struct _MetaWindowClass
+                                   guint32     timestamp);
+   void (*kill)                   (MetaWindow *window);
+   void (*focus)                  (MetaWindow *window,
+-                                  guint32     timestamp);
++                                  guint32     timestamp,
++                                  gboolean    warp_pointer);
+   void (*grab_op_began)          (MetaWindow *window,
+                                   MetaGrabOp  op);
+   void (*grab_op_ended)          (MetaWindow *window,
+@@ -688,10 +689,11 @@ void        meta_window_update_struts      (MetaWindow  *window);
+ gboolean    meta_window_geometry_contains_rect (MetaWindow   *window,
+                                                 MtkRectangle *rect);
+ 
+-void        meta_window_update_appears_focused (MetaWindow *window);
++void        meta_window_update_appears_focused (MetaWindow *window, gboolean warp_pointer);
+ 
+ void     meta_window_set_focused_internal (MetaWindow *window,
+-                                           gboolean    focused);
++                                           gboolean    focused,
++                                           gboolean    warp_pointer);
+ 
+ gboolean meta_window_is_focusable (MetaWindow *window);
+ 
+diff --git a/src/core/window.c b/src/core/window.c
+index 3cc26a2520..37e6150c93 100644
+--- a/src/core/window.c
++++ b/src/core/window.c
+@@ -83,6 +83,7 @@
+ #include "meta/meta-external-constraint.h"
+ #include "meta/prefs.h"
+ #include "meta/meta-window-config.h"
++#include "mtk-rectangle.h"
+ #include "wayland/meta-wayland-private.h"
+ #include "wayland/meta-wayland-surface-private.h"
+ #include "wayland/meta-window-wayland.h"
+@@ -282,7 +283,7 @@ prefs_changed_callback (MetaPreference pref,
+     }
+   else if (pref == META_PREF_FOCUS_MODE)
+     {
+-      meta_window_update_appears_focused (window);
++      meta_window_update_appears_focused (window, TRUE);
+     }
+ }
+ 
+@@ -2589,7 +2590,7 @@ meta_window_show (MetaWindow *window)
+           timestamp = meta_display_get_current_time_roundtrip (window->display);
+ 
+           if (meta_display_windows_are_interactable (window->display))
+-            meta_window_focus (window, timestamp);
++            meta_window_focus (window, timestamp, TRUE);
+           else
+             meta_display_queue_focus (window->display, window);
+         }
+@@ -3916,7 +3917,7 @@ meta_window_activate_full (MetaWindow     *window,
+               window->desc);
+ 
+   if (meta_window_located_on_workspace (window, workspace))
+-    meta_window_focus (window, timestamp);
++    meta_window_focus (window, timestamp, TRUE);
+   else
+     meta_workspace_activate_with_focus (window->workspace, window, timestamp);
+ 
+@@ -4998,7 +4999,8 @@ meta_window_make_most_recent (MetaWindow    *window,
+ /* XXX META_EFFECT_FOCUS */
+ void
+ meta_window_focus (MetaWindow  *window,
+-                   guint32      timestamp)
++                   guint32      timestamp,
++                   gboolean     warp_pointer)
+ {
+   MetaWorkspaceManager *workspace_manager = window->display->workspace_manager;
+   MetaWindow *modal_transient;
+@@ -5062,7 +5064,7 @@ meta_window_focus (MetaWindow  *window,
+       return;
+     }
+ 
+-  META_WINDOW_GET_CLASS (window)->focus (window, timestamp);
++  META_WINDOW_GET_CLASS (window)->focus (window, timestamp, warp_pointer);
+ 
+   /* Move to the front of all workspaces' MRU lists the window
+    * is on. We should only be "removing" it from the MRU list if
+@@ -5164,7 +5166,7 @@ set_workspace_state (MetaWindow    *window,
+   window->in_workspace_change = FALSE;
+ 
+   if (!window->constructing)
+-    meta_window_update_appears_focused (window);
++    meta_window_update_appears_focused (window, TRUE);
+ 
+   /* queue a move_resize since changing workspaces may change
+    * the relevant struts
+@@ -5566,7 +5568,7 @@ meta_window_change_workspace_by_index (MetaWindow *window,
+ }
+ 
+ void
+-meta_window_update_appears_focused (MetaWindow *window)
++meta_window_update_appears_focused (MetaWindow *window, gboolean warp_pointer)
+ {
+   MetaWorkspaceManager *workspace_manager;
+   MetaWorkspace *workspace;
+@@ -5589,6 +5591,18 @@ meta_window_update_appears_focused (MetaWindow *window)
+   if (window->appears_focused == appears_focused)
+     return;
+ 
++  if (appears_focused && warp_pointer) {
++    MetaCompositor *compositor = meta_display_get_compositor (window->display);
++    MetaBackend *backend = meta_compositor_get_backend (compositor);
++    ClutterBackend *clutter_backend = meta_backend_get_clutter_backend (backend);
++    ClutterSeat *seat = clutter_backend_get_default_seat (clutter_backend);
++    MtkRectangle rect = window->buffer_rect;
++    int x = rect.x + rect.width / 2;
++    int y = rect.y + rect.height / 2;
++
++    clutter_seat_warp_pointer (seat, x, y);
++  }
++
+   window->appears_focused = appears_focused;
+ 
+   set_net_wm_state (window);
+@@ -5663,7 +5677,7 @@ meta_window_propagate_focus_appearance (MetaWindow *window,
+ 
+       if (child_focus_state_changed && !parent->has_focus)
+         {
+-          meta_window_update_appears_focused (parent);
++          meta_window_update_appears_focused (parent, TRUE);
+         }
+ 
+       child = parent;
+@@ -5673,7 +5687,8 @@ meta_window_propagate_focus_appearance (MetaWindow *window,
+ 
+ void
+ meta_window_set_focused_internal (MetaWindow *window,
+-                                  gboolean    focused)
++                                  gboolean    focused,
++                                  gboolean    warp_pointer)
+ {
+   if (focused)
+     {
+@@ -5684,7 +5699,7 @@ meta_window_set_focused_internal (MetaWindow *window,
+       g_signal_emit (window, window_signals[FOCUS], 0);
+ 
+       if (!window->attached_focus_window)
+-        meta_window_update_appears_focused (window);
++        meta_window_update_appears_focused (window, warp_pointer);
+ 
+       meta_window_propagate_focus_appearance (window, TRUE);
+     }
+@@ -5697,7 +5712,7 @@ meta_window_set_focused_internal (MetaWindow *window,
+       meta_window_propagate_focus_appearance (window, FALSE);
+ 
+       if (!window->attached_focus_window)
+-        meta_window_update_appears_focused (window);
++        meta_window_update_appears_focused (window, TRUE);
+     }
+ }
+ 
+@@ -7736,7 +7751,7 @@ meta_window_handle_ungrabbed_event (MetaWindow         *window,
+       meta_topic (META_DEBUG_FOCUS,
+                   "Focusing %s due to button %u press (display.c)",
+                   window->desc, button);
+-      meta_window_focus (window, time_ms);
++      meta_window_focus (window, time_ms, TRUE);
+       meta_window_check_alive (window, time_ms);
+     }
+ 
+diff --git a/src/core/workspace.c b/src/core/workspace.c
+index 5ba623e8bf..c11770873d 100644
+--- a/src/core/workspace.c
++++ b/src/core/workspace.c
+@@ -350,7 +350,7 @@ update_workspace_default_focus (MetaWorkspace *workspace,
+ 
+       if (meta_window_located_on_workspace (window, workspace) &&
+           window != not_this_one)
+-        meta_window_update_appears_focused (window);
++        meta_window_update_appears_focused (window, TRUE);
+     }
+ }
+ 
+@@ -1420,7 +1420,7 @@ meta_workspace_focus_default_window (MetaWorkspace *workspace,
+     {
+       meta_topic (META_DEBUG_FOCUS,
+                   "Focusing mouse window %s", window->desc);
+-      meta_window_focus (window, timestamp);
++      meta_window_focus (window, timestamp, TRUE);
+     }
+ 
+   if (workspace->display->autoraise_window != window &&
+@@ -1625,7 +1625,7 @@ try_to_set_focus_and_check (MetaWindow *window,
+                             MetaWindow *not_this_one,
+                             uint32_t    timestamp)
+ {
+-  meta_window_focus (window, timestamp);
++  meta_window_focus (window, timestamp, TRUE);
+ 
+   /* meta_focus_window() will not change focus for clients using the
+    * "globally active input" model of input handling, hence defeating
+diff --git a/src/meta/display.h b/src/meta/display.h
+index 2308311009..0e6ecc7af1 100644
+--- a/src/meta/display.h
++++ b/src/meta/display.h
+@@ -275,7 +275,8 @@ MetaSelection * meta_display_get_selection (MetaDisplay *display);
+ META_EXPORT
+ void meta_display_set_input_focus   (MetaDisplay *display,
+                                      MetaWindow  *window,
+-                                     guint32      timestamp);
++                                     guint32      timestamp,
++                                     gboolean     warp_pointer);
+ META_EXPORT
+ void meta_display_unset_input_focus (MetaDisplay *display,
+                                      guint32      timestamp);
+diff --git a/src/meta/window.h b/src/meta/window.h
+index 761896b33e..6ea742ac87 100644
+--- a/src/meta/window.h
++++ b/src/meta/window.h
+@@ -371,7 +371,8 @@ void        meta_window_kill               (MetaWindow  *window);
+ 
+ META_EXPORT
+ void        meta_window_focus              (MetaWindow  *window,
+-                                            guint32      timestamp);
++                                            guint32      timestamp,
++                                            gboolean     warp_pointer);
+ 
+ META_EXPORT
+ void        meta_window_check_alive        (MetaWindow  *window,
+diff --git a/src/wayland/meta-wayland-xdg-shell.c b/src/wayland/meta-wayland-xdg-shell.c
+index d91b08a1af..5cb4f1ccec 100644
+--- a/src/wayland/meta-wayland-xdg-shell.c
++++ b/src/wayland/meta-wayland-xdg-shell.c
+@@ -1371,7 +1371,7 @@ finish_popup_setup (MetaWaylandXdgPopup *xdg_popup)
+       MetaWaylandPopupSurface *popup_surface;
+       MetaWaylandPopup *popup;
+ 
+-      meta_window_focus (window, meta_display_get_current_time (display));
++      meta_window_focus (window, meta_display_get_current_time (display), TRUE);
+       popup_surface = META_WAYLAND_POPUP_SURFACE (surface->role);
+ 
+       if (!xdg_shell_client->popup_grab)
+diff --git a/src/wayland/meta-window-wayland.c b/src/wayland/meta-window-wayland.c
+index 6d20598abc..3d1cd19999 100644
+--- a/src/wayland/meta-window-wayland.c
++++ b/src/wayland/meta-window-wayland.c
+@@ -195,13 +195,15 @@ meta_window_wayland_kill (MetaWindow *window)
+ 
+ static void
+ meta_window_wayland_focus (MetaWindow *window,
+-                           guint32     timestamp)
++                           guint32     timestamp,
++                           gboolean    warp_pointer)
+ {
+   if (meta_window_is_focusable (window))
+     {
+       meta_display_set_input_focus (window->display,
+                                     window,
+-                                    timestamp);
++                                    timestamp,
++                                    warp_pointer);
+     }
+ }
+ 
+diff --git a/src/x11/events.c b/src/x11/events.c
+index 96978dc82b..7fcc09d316 100644
+--- a/src/x11/events.c
++++ b/src/x11/events.c
+@@ -908,7 +908,8 @@ handle_window_focus_event (MetaX11Display *x11_display,
+     {
+       x11_display->is_server_focus = TRUE;
+       meta_display_set_input_focus (display, focus_window,
+-                                    meta_display_get_current_time_roundtrip (display));
++                                    meta_display_get_current_time_roundtrip (display),
++                                    TRUE);
+       x11_display->is_server_focus = FALSE;
+ 
+       return TRUE;
+@@ -1421,7 +1422,8 @@ handle_other_xevent (MetaX11Display *x11_display,
+                window->reparents_pending == 0)
+         {
+           meta_window_focus (window,
+-                             meta_display_get_current_time_roundtrip (display));
++                             meta_display_get_current_time_roundtrip (display),
++                             TRUE);
+         }
+ 
+       break;
+@@ -1876,7 +1878,8 @@ meta_x11_display_handle_xevent (MetaX11Display *x11_display,
+ 
+       x11_display->is_server_focus = TRUE;
+       meta_display_set_input_focus (display, display->focus_window,
+-                                    meta_display_get_current_time_roundtrip (display));
++                                    meta_display_get_current_time_roundtrip (display),
++                                    TRUE);
+       x11_display->is_server_focus = FALSE;
+     }
+ 
+diff --git a/src/x11/window-x11.c b/src/x11/window-x11.c
+index d7dda58b7e..ba73825898 100644
+--- a/src/x11/window-x11.c
++++ b/src/x11/window-x11.c
+@@ -866,7 +866,7 @@ focus_window_delayed_timeout (gpointer user_data)
+   data->timeout_id = 0;
+   meta_window_x11_delayed_focus_data_free (data);
+ 
+-  meta_window_focus (window, timestamp);
++  meta_window_focus (window, timestamp, TRUE);
+ }
+ 
+ static void
+@@ -946,7 +946,8 @@ maybe_focus_default_window (MetaDisplay *display,
+ 
+ static void
+ meta_window_x11_focus (MetaWindow *window,
+-                       guint32     timestamp)
++                       guint32     timestamp,
++                       gboolean    warp_pointer)
+ {
+   MetaWindowX11 *window_x11 = META_WINDOW_X11 (window);
+   MetaWindowX11Private *priv =
+@@ -973,7 +974,8 @@ meta_window_x11_focus (MetaWindow *window,
+ 
+       meta_display_set_input_focus (window->display,
+                                     window,
+-                                    timestamp);
++                                    timestamp,
++                                    warp_pointer);
+     }
+ 
+   if (priv->wm_take_focus)

@@ -1,0 +1,37 @@
+diff --git a/src/core/prefs.c b/src/core/prefs.c
+index 19369d8a09..e1778c5592 100644
+--- a/src/core/prefs.c
++++ b/src/core/prefs.c
+@@ -38,6 +38,7 @@
+ #include "core/meta-accel-parse.h"
+ #include "core/prefs-private.h"
+ #include "core/util-private.h"
++#include "gdesktop-enums.h"
+ #include "meta/prefs.h"
+ 
+ /* If you add a key, it needs updating in init() and in the gsettings
+@@ -1151,7 +1152,7 @@ meta_prefs_get_mouse_button_mods  (void)
+ GDesktopFocusMode
+ meta_prefs_get_focus_mode (void)
+ {
+-  return focus_mode;
++  return G_DESKTOP_FOCUS_MODE_SLOPPY;
+ }
+ 
+ GDesktopFocusNewWindows
+@@ -2101,13 +2102,13 @@ meta_prefs_get_action_right_click_titlebar (void)
+ gboolean
+ meta_prefs_get_auto_raise (void)
+ {
+-  return auto_raise;
++  return TRUE;
+ }
+ 
+ int
+ meta_prefs_get_auto_raise_delay (void)
+ {
+-  return auto_raise_delay;
++  return 0;
+ }
+ 
+ gboolean
