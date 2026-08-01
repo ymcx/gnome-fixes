@@ -88,16 +88,24 @@ source=(
   # Mutter tags use SSH signatures which makepkg doesn't understand
   "git+$url.git#tag=${pkgver/[a-z]/.&}"
   "git+https://gitlab.gnome.org/GNOME/gvdb.git#commit=b54bc5da25127ef416858a3ad92e57159ff565b3"
+  "0001-fix-window-focus-workspace-move.patch"
+  "0002-no-delay-sloppy-focus.patch"
+  "0003-update-gsettings.patch"
+  "0004-mouse-follows-focus.patch"
 )
 b2sums=('5d9b28db0fc461560378adaec354a1cdeb86108541ea8d1bd68c91f1ddc6ebba02d0c5c01d46e808456df8d151251bbcfa25b5aec30be8349ed9e0912c7606d4'
-        'f989bc2ceb52aad3c6a23c439df3bbc672bc11d561a247d19971d30cc85ed5d42295de40f8e55b13404ed32aa44f12307c9f5b470f2e288d1c9c8329255c43bf')
+        'f989bc2ceb52aad3c6a23c439df3bbc672bc11d561a247d19971d30cc85ed5d42295de40f8e55b13404ed32aa44f12307c9f5b470f2e288d1c9c8329255c43bf'
+        '087efa74cf91092a2b8c7cb1793dc1d0eb8a76018a22fa38b8bba70f93ed895bdb7048d2d7c19e58e9f58f8fac96e108501e56411e8b37eebada8d24e23cfdc8'
+        'd698c5c494b0b338b7ae047d7fef8c31d9ce8df3e8e8ce3fc252187b08e1ab9c4f0bac103ea3bffcd6fe9117e14470ab60856cb9b00174305c13c5c6623a9782'
+        'c506b59d5788f1d1bcb67f105521db289142e5714d94deda084054dd273d71ef31ffcf844c3cee2720530876f1c0c8b9462e7e767058a63c97516e545e4196e2'
+        'e71cf8d4a4d27d33f792fd54e2a060db2f713b7136a82da261dc983097d34aa1df6ed5dab1ee69cc3bc4a16a1ff696ab1baf732f8e91616dddac9e3b2180c40a')
 
 prepare() {
   cd mutter
-  git apply ../../patches/0001-fix-window-focus-workspace-move.patch
-  git apply ../../patches/0002-no-delay-sloppy-focus.patch
-  git apply ../../patches/0003-update-gsettings.patch
-  git apply ../../patches/0004-mouse-follows-focus.patch
+  git apply ../0001-fix-window-focus-workspace-move.patch
+  git apply ../0002-no-delay-sloppy-focus.patch
+  git apply ../0003-update-gsettings.patch
+  git apply ../0004-mouse-follows-focus.patch
 }
 
 build() {
