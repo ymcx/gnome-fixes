@@ -115,6 +115,7 @@ build() {
     -D installed_tests=false
     -D tests=disabled
     -D wayland_eglstream=true
+    -D xwayland=false
   )
 
   CFLAGS="${CFLAGS/-O2/-O3} -fno-semantic-interposition"
