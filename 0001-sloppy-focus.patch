@@ -1,0 +1,40 @@
+diff --git a/src/core/display.c b/src/core/display.c
+index 45f8080bd3..6fe51fea9f 100644
+--- a/src/core/display.c
++++ b/src/core/display.c
+@@ -3556,7 +3556,7 @@ focus_on_pointer_rest_callback (gpointer data)
+  * mode to check whether the pointer has stopped moving after a
+  * crossing event.
+  */
+-#define FOCUS_TIMEOUT_DELAY 25
++#define FOCUS_TIMEOUT_DELAY 0
+ 
+ static void
+ queue_pointer_rest_callback (MetaDisplay *display,
+diff --git a/src/core/prefs.c b/src/core/prefs.c
+index 19369d8a09..b6db5cdb63 100644
+--- a/src/core/prefs.c
++++ b/src/core/prefs.c
+@@ -1151,7 +1151,7 @@ meta_prefs_get_mouse_button_mods  (void)
+ GDesktopFocusMode
+ meta_prefs_get_focus_mode (void)
+ {
+-  return focus_mode;
++  return G_DESKTOP_FOCUS_MODE_SLOPPY;
+ }
+ 
+ GDesktopFocusNewWindows
+diff --git a/src/core/window.c b/src/core/window.c
+index 3cc26a2520..684bf5d67c 100644
+--- a/src/core/window.c
++++ b/src/core/window.c
+@@ -5578,8 +5578,7 @@ meta_window_update_appears_focused (MetaWindow *window)
+   if (workspace && workspace != workspace_manager->active_workspace)
+     {
+       appears_focused =
+-        window == meta_workspace_get_default_focus_window (workspace, NULL) &&
+-        meta_prefs_get_focus_mode () == G_DESKTOP_FOCUS_MODE_CLICK;
++        window == meta_workspace_get_default_focus_window (workspace, NULL);
+     }
+   else
+     {
