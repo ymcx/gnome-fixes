@@ -1,5 +1,5 @@
 diff --git a/src/core/window.c b/src/core/window.c
-index 3cc26a2520..30d657a01d 100644
+index 3cc26a2520..3e8281a98b 100644
 --- a/src/core/window.c
 +++ b/src/core/window.c
 @@ -2588,10 +2588,13 @@ meta_window_show (MetaWindow *window)
@@ -9,9 +9,9 @@ index 3cc26a2520..30d657a01d 100644
 -          if (meta_display_windows_are_interactable (window->display))
 +          if (meta_display_windows_are_interactable (window->display)) {
 +            // Open window
++            pointer_warp_window (window);
              meta_window_focus (window, timestamp);
 -          else
-+            pointer_warp_window (window);
 +          } else {
              meta_display_queue_focus (window->display, window);
 +          }
@@ -25,9 +25,9 @@ index 3cc26a2520..30d657a01d 100644
 -  if (meta_window_located_on_workspace (window, workspace))
 +  if (meta_window_located_on_workspace (window, workspace)) {
 +    // Focus another window
++    pointer_warp_window (window);
      meta_window_focus (window, timestamp);
 -  else
-+    pointer_warp_window (window);
 +  } else {
      meta_workspace_activate_with_focus (window->workspace, window, timestamp);
 +  }
@@ -35,7 +35,7 @@ index 3cc26a2520..30d657a01d 100644
    meta_display_maybe_update_sticky_mouse_focus (window->display);
  
 diff --git a/src/core/workspace.c b/src/core/workspace.c
-index 5ba623e8bf..d8aabd45bb 100644
+index 5ba623e8bf..14072f78fe 100644
 --- a/src/core/workspace.c
 +++ b/src/core/workspace.c
 @@ -46,6 +46,7 @@
@@ -46,26 +46,28 @@ index 5ba623e8bf..d8aabd45bb 100644
  
  void meta_workspace_queue_calc_showing   (MetaWorkspace *workspace);
  static void focus_ancestor_or_mru_window (MetaWorkspace *workspace,
-@@ -1625,7 +1626,9 @@ try_to_set_focus_and_check (MetaWindow *window,
+@@ -1625,6 +1626,8 @@ try_to_set_focus_and_check (MetaWindow *window,
                              MetaWindow *not_this_one,
                              uint32_t    timestamp)
  {
 +  // Close window
-   meta_window_focus (window, timestamp);
 +  pointer_warp_window (window);
+   meta_window_focus (window, timestamp);
  
    /* meta_focus_window() will not change focus for clients using the
-    * "globally active input" model of input handling, hence defeating
 diff --git a/src/wayland/meta-wayland-pointer-warp.c b/src/wayland/meta-wayland-pointer-warp.c
-index 89d9d1e7c8..df725a9c0a 100644
+index 89d9d1e7c8..d275eb5173 100644
 --- a/src/wayland/meta-wayland-pointer-warp.c
 +++ b/src/wayland/meta-wayland-pointer-warp.c
-@@ -35,6 +35,20 @@ struct _MetaWaylandPointerWarp
+@@ -35,6 +35,23 @@ struct _MetaWaylandPointerWarp
    struct wl_list resource_list;
  };
  
 +void
 +pointer_warp_window (MetaWindow *window) {
++  if (window->has_focus)
++    return;
++
 +  MetaDisplay *display = window->display;
 +  MetaCompositor *compositor = meta_display_get_compositor (display);
 +  MetaBackend *backend = meta_compositor_get_backend (compositor);
