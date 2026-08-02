@@ -12,7 +12,7 @@ index 45f8080bd3..6fe51fea9f 100644
  static void
  queue_pointer_rest_callback (MetaDisplay *display,
 diff --git a/src/core/prefs.c b/src/core/prefs.c
-index 19369d8a09..b6db5cdb63 100644
+index 19369d8a09..b219a5094d 100644
 --- a/src/core/prefs.c
 +++ b/src/core/prefs.c
 @@ -1151,7 +1151,7 @@ meta_prefs_get_mouse_button_mods  (void)
@@ -24,6 +24,22 @@ index 19369d8a09..b6db5cdb63 100644
  }
  
  GDesktopFocusNewWindows
+@@ -2101,13 +2101,13 @@ meta_prefs_get_action_right_click_titlebar (void)
+ gboolean
+ meta_prefs_get_auto_raise (void)
+ {
+-  return auto_raise;
++  return TRUE;
+ }
+ 
+ int
+ meta_prefs_get_auto_raise_delay (void)
+ {
+-  return auto_raise_delay;
++  return 0;
+ }
+ 
+ gboolean
 diff --git a/src/core/window.c b/src/core/window.c
 index 3cc26a2520..684bf5d67c 100644
 --- a/src/core/window.c
