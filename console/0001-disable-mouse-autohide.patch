@@ -1,0 +1,12 @@
+diff --git a/src/kgx-terminal.c b/src/kgx-terminal.c
+index 0218605..bd1e99a 100644
+--- a/src/kgx-terminal.c
++++ b/src/kgx-terminal.c
+@@ -939,7 +939,6 @@ kgx_terminal_init (KgxTerminal *self)
+   gtk_widget_action_set_enabled (GTK_WIDGET (self), "term.copy", FALSE);
+   gtk_widget_action_set_enabled (GTK_WIDGET (self), "term.show-in-files", FALSE);
+ 
+-  vte_terminal_set_mouse_autohide (VTE_TERMINAL (self), TRUE);
+   vte_terminal_search_set_wrap_around (VTE_TERMINAL (self), TRUE);
+ 
+   for (int i = 0; i < KGX_TERMINAL_N_LINK_REGEX; i++) {
