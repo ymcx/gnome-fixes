@@ -88,18 +88,15 @@ source=(
   # Mutter tags use SSH signatures which makepkg doesn't understand
   "git+$url.git#tag=${pkgver/[a-z]/.&}"
   "git+https://gitlab.gnome.org/GNOME/gvdb.git#commit=b54bc5da25127ef416858a3ad92e57159ff565b3"
-  "0001-sloppy-focus.patch"
-  "0002-mouse-warp.patch"
+  "0001-mouse-warp.patch"
 )
 b2sums=('5d9b28db0fc461560378adaec354a1cdeb86108541ea8d1bd68c91f1ddc6ebba02d0c5c01d46e808456df8d151251bbcfa25b5aec30be8349ed9e0912c7606d4'
         'f989bc2ceb52aad3c6a23c439df3bbc672bc11d561a247d19971d30cc85ed5d42295de40f8e55b13404ed32aa44f12307c9f5b470f2e288d1c9c8329255c43bf'
-        '07ef6f963d5237dc1825c2ac3023f93a43b079939c985dc7d4625736ed6d8ce211a5d82ae8b586a7c387a386d85aaf34ace01ecbd7f7d464abf0d2884cadbd57'
-        '7ef0e9be8acb2093e80d7444caf31bfc2a9cfd8dc88ac3d2d2b7e0f2ad224a67bb7fbf2a3b1d1100326b15528366652276c657406b97b2b933e2961f3432c750')
+        '6a31bec7069b9e6d724f562f65cfe4908ef0cf0935cc742a12ac1a88ec9bcf5eac03113a52e63dce84c383dd35cc4b2b98301266dd74744b38d18d75cc99e8b8')
 
 prepare() {
   cd mutter
-  git apply ../0001-sloppy-focus.patch
-  git apply ../0002-mouse-warp.patch
+  git apply ../0001-mouse-warp.patch
 }
 
 build() {
