@@ -1,18 +1,19 @@
 diff --git a/src/compositor/meta-window-drag.c b/src/compositor/meta-window-drag.c
-index 00b0ce2797..b9a83d493d 100644
+index 00b0ce2797..33f54d2b2d 100644
 --- a/src/compositor/meta-window-drag.c
 +++ b/src/compositor/meta-window-drag.c
-@@ -2027,7 +2027,7 @@ meta_window_drag_begin (MetaWindowDrag      *window_drag,
+@@ -2027,7 +2027,8 @@ meta_window_drag_begin (MetaWindowDrag      *window_drag,
    meta_topic (META_DEBUG_FOCUS,
                "Focusing %s because we're grabbing all its keys",
                window->desc);
 -  meta_window_focus (window, timestamp);
++  // Don't warp the pointer after moving/resizing a window
 +  meta_window_focus (window, timestamp, FALSE);
  
    stage = CLUTTER_STAGE (meta_backend_get_stage (backend));
  
 diff --git a/src/core/display.c b/src/core/display.c
-index 45f8080bd3..c6b8d50ead 100644
+index 45f8080bd3..b155ef534c 100644
 --- a/src/core/display.c
 +++ b/src/core/display.c
 @@ -1150,7 +1150,7 @@ on_is_grabbed_changed (ClutterStage *stage,
@@ -20,7 +21,7 @@ index 45f8080bd3..c6b8d50ead 100644
      return;
  
 -  meta_window_focus (priv->focus_on_grab_dismissed.window, META_CURRENT_TIME);
-+  meta_window_focus (priv->focus_on_grab_dismissed.window, META_CURRENT_TIME, TRUE);
++  meta_window_focus (priv->focus_on_grab_dismissed.window, META_CURRENT_TIME, FALSE);
  
    g_clear_signal_handler (&priv->focus_on_grab_dismissed.unmanaging_handler_id,
                            priv->focus_on_grab_dismissed.window);
@@ -29,12 +30,12 @@ index 45f8080bd3..c6b8d50ead 100644
                    "Focusing %s at time %u.", window->desc, timestamp_ms);
  
 -      meta_window_focus (window, timestamp_ms);
-+      meta_window_focus (window, timestamp_ms, TRUE);
++      meta_window_focus (window, timestamp_ms, FALSE);
  
        if (meta_prefs_get_auto_raise ())
          meta_display_queue_autoraise_callback (display, window);
 diff --git a/src/core/meta-workspace-manager.c b/src/core/meta-workspace-manager.c
-index c314bd8119..c7bc4ed737 100644
+index c314bd8119..1fa6f710dc 100644
 --- a/src/core/meta-workspace-manager.c
 +++ b/src/core/meta-workspace-manager.c
 @@ -963,7 +963,7 @@ meta_workspace_manager_show_desktop (MetaWorkspaceManager *workspace_manager,
@@ -42,33 +43,46 @@ index c314bd8119..c7bc4ed737 100644
        if (w->type == META_WINDOW_DESKTOP)
          {
 -          meta_window_focus (w, timestamp);
-+          meta_window_focus (w, timestamp, TRUE);
++          meta_window_focus (w, timestamp, FALSE);
            break;
          }
      }
 diff --git a/src/core/window.c b/src/core/window.c
-index 3cc26a2520..1dffdca7ab 100644
+index 3cc26a2520..9bb7e73ba4 100644
 --- a/src/core/window.c
 +++ b/src/core/window.c
-@@ -2589,7 +2589,7 @@ meta_window_show (MetaWindow *window)
+@@ -2589,7 +2589,8 @@ meta_window_show (MetaWindow *window)
            timestamp = meta_display_get_current_time_roundtrip (window->display);
  
            if (meta_display_windows_are_interactable (window->display))
 -            meta_window_focus (window, timestamp);
++            // Warp the cursor after opening an Xwayland window
 +            meta_window_focus (window, timestamp, TRUE);
            else
              meta_display_queue_focus (window->display, window);
          }
-@@ -3916,7 +3916,7 @@ meta_window_activate_full (MetaWindow     *window,
+@@ -3849,6 +3850,7 @@ meta_window_activate_full (MetaWindow     *window,
+                            MetaClientType  source_indication,
+                            MetaWorkspace  *workspace)
+ {
++  gboolean window_had_focus = window->has_focus;
+   MetaWorkspaceManager *workspace_manager = window->display->workspace_manager;
+   gboolean allow_workspace_switch;
+ 
+@@ -3916,7 +3918,11 @@ meta_window_activate_full (MetaWindow     *window,
                window->desc);
  
    if (meta_window_located_on_workspace (window, workspace))
 -    meta_window_focus (window, timestamp);
-+    meta_window_focus (window, timestamp, TRUE);
++    // Warp the cursor after focusing on a window
++    // Additionally, don't warp the cursor if the window was already focused.
++    // Not checking for window focus causes a bug where middle-clicking on a
++    // link in Chromium causes the cursor to warp
++    meta_window_focus (window, timestamp, !window_had_focus);
    else
      meta_workspace_activate_with_focus (window->workspace, window, timestamp);
  
-@@ -4998,7 +4998,8 @@ meta_window_make_most_recent (MetaWindow    *window,
+@@ -4998,7 +5004,8 @@ meta_window_make_most_recent (MetaWindow    *window,
  /* XXX META_EFFECT_FOCUS */
  void
  meta_window_focus (MetaWindow  *window,
@@ -78,7 +92,7 @@ index 3cc26a2520..1dffdca7ab 100644
  {
    MetaWorkspaceManager *workspace_manager = window->display->workspace_manager;
    MetaWindow *modal_transient;
-@@ -5091,6 +5092,8 @@ meta_window_focus (MetaWindow  *window,
+@@ -5091,6 +5098,8 @@ meta_window_focus (MetaWindow  *window,
      meta_window_unset_demands_attention (window);
  
  /*  meta_effect_run_focus(window, NULL, NULL); */
@@ -87,17 +101,18 @@ index 3cc26a2520..1dffdca7ab 100644
  }
  
  /* Workspace management. Invariants:
-@@ -7736,7 +7739,7 @@ meta_window_handle_ungrabbed_event (MetaWindow         *window,
+@@ -7736,7 +7745,8 @@ meta_window_handle_ungrabbed_event (MetaWindow         *window,
        meta_topic (META_DEBUG_FOCUS,
                    "Focusing %s due to button %u press (display.c)",
                    window->desc, button);
 -      meta_window_focus (window, time_ms);
++      // Don't warp the cursor after clicking anywhere within a window
 +      meta_window_focus (window, time_ms, FALSE);
        meta_window_check_alive (window, time_ms);
      }
  
 diff --git a/src/core/workspace.c b/src/core/workspace.c
-index 5ba623e8bf..832c1a4cfc 100644
+index 5ba623e8bf..1c08d5ff65 100644
 --- a/src/core/workspace.c
 +++ b/src/core/workspace.c
 @@ -1420,7 +1420,7 @@ meta_workspace_focus_default_window (MetaWorkspace *workspace,
@@ -105,15 +120,16 @@ index 5ba623e8bf..832c1a4cfc 100644
        meta_topic (META_DEBUG_FOCUS,
                    "Focusing mouse window %s", window->desc);
 -      meta_window_focus (window, timestamp);
-+      meta_window_focus (window, timestamp, TRUE);
++      meta_window_focus (window, timestamp, FALSE);
      }
  
    if (workspace->display->autoraise_window != window &&
-@@ -1625,7 +1625,7 @@ try_to_set_focus_and_check (MetaWindow *window,
+@@ -1625,7 +1625,8 @@ try_to_set_focus_and_check (MetaWindow *window,
                              MetaWindow *not_this_one,
                              uint32_t    timestamp)
  {
 -  meta_window_focus (window, timestamp);
++  // Warp the cursor after closing a window
 +  meta_window_focus (window, timestamp, TRUE);
  
    /* meta_focus_window() will not change focus for clients using the
@@ -173,7 +189,7 @@ index 658638b342..2948f7b836 100644
 +
 +void meta_wayland_pointer_warp_window (MetaWindow *window);
 diff --git a/src/wayland/meta-wayland-xdg-shell.c b/src/wayland/meta-wayland-xdg-shell.c
-index d91b08a1af..5cb4f1ccec 100644
+index d91b08a1af..fd80c23415 100644
 --- a/src/wayland/meta-wayland-xdg-shell.c
 +++ b/src/wayland/meta-wayland-xdg-shell.c
 @@ -1371,7 +1371,7 @@ finish_popup_setup (MetaWaylandXdgPopup *xdg_popup)
@@ -181,12 +197,12 @@ index d91b08a1af..5cb4f1ccec 100644
        MetaWaylandPopup *popup;
  
 -      meta_window_focus (window, meta_display_get_current_time (display));
-+      meta_window_focus (window, meta_display_get_current_time (display), TRUE);
++      meta_window_focus (window, meta_display_get_current_time (display), FALSE);
        popup_surface = META_WAYLAND_POPUP_SURFACE (surface->role);
  
        if (!xdg_shell_client->popup_grab)
 diff --git a/src/x11/events.c b/src/x11/events.c
-index 96978dc82b..1689ae3fb8 100644
+index 96978dc82b..f32478a925 100644
 --- a/src/x11/events.c
 +++ b/src/x11/events.c
 @@ -1421,7 +1421,7 @@ handle_other_xevent (MetaX11Display *x11_display,
@@ -194,12 +210,12 @@ index 96978dc82b..1689ae3fb8 100644
          {
            meta_window_focus (window,
 -                             meta_display_get_current_time_roundtrip (display));
-+                             meta_display_get_current_time_roundtrip (display), TRUE);
++                             meta_display_get_current_time_roundtrip (display), FALSE);
          }
  
        break;
 diff --git a/src/x11/window-x11.c b/src/x11/window-x11.c
-index d7dda58b7e..0893854b00 100644
+index d7dda58b7e..2452bf66bf 100644
 --- a/src/x11/window-x11.c
 +++ b/src/x11/window-x11.c
 @@ -866,7 +866,7 @@ focus_window_delayed_timeout (gpointer user_data)
@@ -207,7 +223,7 @@ index d7dda58b7e..0893854b00 100644
    meta_window_x11_delayed_focus_data_free (data);
  
 -  meta_window_focus (window, timestamp);
-+  meta_window_focus (window, timestamp, TRUE);
++  meta_window_focus (window, timestamp, FALSE);
  }
  
  static void
